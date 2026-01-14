@@ -21,7 +21,7 @@ def norm_code(x) -> str | None:
 
 
 CFG = {
-    "out_dir": "./output",
+    "out_dir": "./output1",
     "cache_dir": "./cache",
 
     # CSV gzip 缓存
@@ -53,6 +53,23 @@ CFG = {
     # 调试
     "debug_limit_concepts": 0,   # >0 只拉前N个概念用于调试
 }
+
+CFG.update({
+    # 概念过滤：去掉指数/通道/规则类
+    "concept_member_cnt_min": 15,
+    "concept_member_cnt_max": 500,
+    "concept_exclude_keywords": [
+        "HS", "沪深", "上证", "中证", "深证", "创业板", "科创",
+        "MSCI", "标普", "纳斯达克", "道琼斯", "罗素",
+        "指数", "成份", "ETF",
+        "沪股通", "深股通", "港股通", "融资融券",
+        "A股", "B股", "H股", "北证",
+        "韩国", "首尔",  # 你榜单里出现“标普首尔”这类明显非A股题材
+    ],
+
+    # 公告类型：收敛为更像“产业催化”的
+    "notice_report_types": ["重大事项", "融资公告", "资产重组"],
+})
 
 
 # ---------------- utilities ----------------
@@ -202,7 +219,8 @@ def _notice_call_compat(rt: str, pages: str):
 
 
 def fetch_notices() -> pd.DataFrame:
-    report_types = ["重大事项", "融资公告", "资产重组", "信息变更", "持股变动", "风险提示"]
+    # report_types = ["重大事项", "融资公告", "资产重组", "信息变更", "持股变动", "风险提示"]
+    report_types = CFG["notice_report_types"]
     scan_days = CFG["notice_lookback_days"]
 
     print("[notice] signature:", inspect.signature(ak.stock_notice_report))
@@ -429,16 +447,42 @@ def build_concept_scores(members, notice_feat, jgdy_feat) -> pd.DataFrame:
         "member_cnt": int(len(df)),
     })).reset_index(drop=True)
 
-    out["z_notice_7d"] = _zscore(out["notice_hit_7d"])
+    # ====== [新增] 过滤非题材概念：宽基/通道/风格/成份 ======
+    MAX_MEMBER = 250
+    EXCLUDE = ["指数", "成份", "HS", "沪深", "上证", "中证", "深证", "MSCI", "标普", "富时",
+               "沪股通", "深股通", "港股通", "融资融券", "百元股", "500", "300", "100", "50"]
+
+    # 注意：你的列名可能是 concept_member_cnt（你表里是 member_cnt / concept_member_cnt 二选一）
+    member_col = "concept_member_cnt" if "concept_member_cnt" in out.columns else "member_cnt"
+
+    out = out[(out[member_col] >= 15) & (out[member_col] <= MAX_MEMBER)].copy()
+    pat = "|".join(EXCLUDE)
+    out = out[~out["概念"].astype(str).str.contains(pat, regex=True, na=False)].copy()
+
+    # --- 过滤：member_cnt 过大/过小 & 关键词黑名单 ---
+    out = out[(out["member_cnt"] >= CFG["concept_member_cnt_min"]) &
+              (out["member_cnt"] <= CFG["concept_member_cnt_max"])].copy()
+
+    pat = "|".join(map(repr, CFG["concept_exclude_keywords"])).replace("'", "")
+    out = out[~out["概念"].astype(str).str.contains(pat, regex=True, na=False)].copy()
+
+    # --- 规模归一化：用“信号密度”替代绝对量 ---
+    den = np.sqrt(out["member_cnt"].clip(lower=1))
+    out["notice_rate_7d"] = out["notice_hit_7d"] / den
+    out["notice_rate_30d"] = out["notice_hit_30d"] / den
+    out["jgdy_rate_30d"] = out["jgdy_sum_30d"] / den
+
+    # --- 重新zscore：用 rate + accel，少用绝对量 ---
+    out["z_notice_rate_7d"] = _zscore(out["notice_rate_7d"])
     out["z_notice_accel"] = _zscore(out["notice_accel_mean"])
-    out["z_jgdy_30d"] = _zscore(out["jgdy_sum_30d"])
+    out["z_jgdy_rate_30d"] = _zscore(out["jgdy_rate_30d"])
     out["z_jgdy_accel"] = _zscore(out["jgdy_accel_mean"])
 
     out["info_score"] = (
-        0.40 * out["z_notice_7d"] +
-        0.20 * out["z_notice_accel"] +
-        0.30 * out["z_jgdy_30d"] +
-        0.10 * out["z_jgdy_accel"]
+            0.45 * out["z_notice_rate_7d"] +
+            0.20 * out["z_notice_accel"] +
+            0.25 * out["z_jgdy_rate_30d"] +
+            0.10 * out["z_jgdy_accel"]
     )
 
     out = out.sort_values("info_score", ascending=False).reset_index(drop=True)
@@ -452,10 +496,23 @@ def build_concept_scores(members, notice_feat, jgdy_feat) -> pd.DataFrame:
     tmp = pd.DataFrame({"概念": concepts, "concept_ret_20d": rets, "concept_fund_in_20d": funds})
     out = out.merge(tmp, on="概念", how="left")
 
-    out["z_ret20"] = _zscore(out["concept_ret_20d"])
-    out["z_fund20"] = _zscore(out["concept_fund_in_20d"])
+    # ====== [替换] 过热惩罚：只惩罚“涨太多/流入太强”，不奖励下跌/流出 ======
+    out["z_concept_ret_20d"] = _zscore(out["concept_ret_20d"])
+    out["z_concept_fund_in_20d"] = _zscore(out["concept_fund_in_20d"])
 
-    out["incubating_score"] = out["info_score"] - (0.55 * out["z_ret20"].fillna(0) + 0.45 * out["z_fund20"].fillna(0))
+    def relu(x):
+        return np.maximum(x, 0)
+
+    out["overheat"] = (
+            0.55 * relu(out["z_concept_ret_20d"].fillna(0.0)) +
+            0.45 * relu(out["z_concept_fund_in_20d"].fillna(0.0))
+    )
+
+    out["incubating_score"] = out["info_score"] - out["overheat"]
+
+    # 可选：避免明显走弱的概念（你不想捡下跌垃圾）
+    out = out[(out["concept_ret_20d"].isna()) | (out["concept_ret_20d"] > -0.08)].copy()
+
     return out
 
 
