@@ -168,14 +168,23 @@ def normalize_stock_hist(df: pd.DataFrame) -> pd.DataFrame:
 # =========================
 # 数据拉取
 # =========================
-def fetch_concept_list() -> pd.DataFrame:
-    df = ak.stock_board_concept_name_em()
-    code_col = _pick_col(df, ["板块代码", "代码", "symbol"])
-    name_col = _pick_col(df, ["板块名称", "名称", "name"])
-    out = df[[code_col, name_col]].rename(columns={code_col: "concept_code", name_col: "concept_name"})
-    out["concept_code"] = out["concept_code"].astype(str)
-    out["concept_name"] = out["concept_name"].astype(str)
-    return out
+def fetch_concept_list(cfg: Config) -> pd.DataFrame:
+    last_err = None
+    for i in range(cfg.retries + 1):
+        try:
+            time.sleep(random.uniform(*cfg.sleep_range))
+            df = ak.stock_board_concept_name_em()
+            code_col = _pick_col(df, ["板块代码", "代码", "symbol"])
+            name_col = _pick_col(df, ["板块名称", "名称", "name"])
+            out = df[[code_col, name_col]].rename(columns={code_col: "concept_code", name_col: "concept_name"})
+            out["concept_code"] = out["concept_code"].astype(str)
+            out["concept_name"] = out["concept_name"].astype(str)
+            return out
+        except Exception as e:
+            last_err = e
+            time.sleep(0.4 * (i + 1))
+
+    raise RuntimeError(f"概念列表拉取失败，last_err={last_err}")
 
 
 def fetch_concept_hist(concept_name: str, concept_code: str, cfg: Config) -> pd.DataFrame:
@@ -334,7 +343,7 @@ def concept_stage(ret_5d: float, accel: float, amt_ratio: float, breakout_60d: f
 
 
 def build_concept_rank(cfg: Config) -> pd.DataFrame:
-    concept_list = fetch_concept_list()
+    concept_list = fetch_concept_list(cfg)
     if cfg.debug_sample and cfg.debug_sample > 0:
         concept_list = concept_list.head(cfg.debug_sample).copy()
 
