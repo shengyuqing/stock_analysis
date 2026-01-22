@@ -3,7 +3,11 @@ import pandas as pd
 from datetime import datetime
 import time
 
-pd.set_option('future.no_silent_downcasting', True)
+try:
+    pd.set_option('future.no_silent_downcasting', True)
+except (ValueError, KeyError):
+    # 老版本 pandas 没有该选项，忽略即可
+    pass
 
 
 # ------------ 工具函数 ------------
@@ -46,6 +50,28 @@ def get_all_a_share_basic() -> pd.DataFrame:
     return df[['代码', '名称']]
 
 
+def _fetch_baidu_indicator(stock_code: str, indicators: list[str]) -> float:
+    """
+    按候选指标顺序尝试获取百度估值指标的最新数值。
+    """
+    last_error = None
+    for indicator in indicators:
+        try:
+            df = ak.stock_zh_valuation_baidu(symbol=stock_code, indicator=indicator)
+            if df.empty or 'value' not in df.columns:
+                raise RuntimeError(f"百度估值-{indicator} 数据为空或缺少 value 列")
+            df = df.copy()
+            df['value'] = pd.to_numeric(df['value'], errors='coerce')
+            df = df.dropna(subset=['value'])
+            if df.empty:
+                raise RuntimeError(f"百度估值-{indicator} value 全为空")
+            return float(df.iloc[-1]['value'])
+        except Exception as exc:
+            last_error = exc
+            continue
+    raise RuntimeError(f"百度估值指标获取失败：{last_error}")
+
+
 def get_baidu_pe_and_mv(stock_code: str):
     """
     从 百度股市通 获取单个股票的：
@@ -53,18 +79,10 @@ def get_baidu_pe_and_mv(stock_code: str):
     - 总市值
     """
     # 市盈率(TTM)
-    pe_df = ak.stock_zh_valuation_baidu(symbol=stock_code, indicator="市盈率(TTM)")
-    if pe_df.empty or 'value' not in pe_df.columns:
-        raise RuntimeError("百度估值-市盈率(TTM) 数据为空")
-    pe_df = pe_df.dropna(subset=['value'])
-    pe_ttm = float(pe_df.iloc[-1]['value'])
+    pe_ttm = _fetch_baidu_indicator(stock_code, ["市盈率(TTM)", "市盈率TTM", "市盈率"])
 
     # 总市值
-    mv_df = ak.stock_zh_valuation_baidu(symbol=stock_code, indicator="总市值")
-    if mv_df.empty or 'value' not in mv_df.columns:
-        raise RuntimeError("百度估值-总市值 数据为空")
-    mv_df = mv_df.dropna(subset=['value'])
-    total_mv = float(mv_df.iloc[-1]['value'])
+    total_mv = _fetch_baidu_indicator(stock_code, ["总市值", "总市值(元)"])
 
     # 注意：这里 total_mv 的单位要跟有形资产保持一致，下面只做相对比较，不考虑绝对单位
     return pe_ttm, total_mv
