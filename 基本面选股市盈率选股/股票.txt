@@ -1,0 +1,185 @@
+
+Stock code: 000001.SZ, Company name: 平安银行, Industry: 银行
+Stock code: 000333.SZ, Company name: 美的集团, Industry: 家用电器
+Stock code: 000404.SZ, Company name: 长虹华意, Industry: 家用电器
+Stock code: 000498.SZ, Company name: 山东路桥, Industry: 建筑工程
+Stock code: 000550.SZ, Company name: 江铃汽车, Industry: 汽车整车
+Stock code: 000598.SZ, Company name: 兴蓉环境, Industry: 水务
+Stock code: 000623.SZ, Company name: 吉林敖东, Industry: 中成药
+Stock code: 000625.SZ, Company name: 长安汽车, Industry: 汽车整车
+Stock code: 000661.SZ, Company name: 长春高新, Industry: 生物制药
+Stock code: 000719.SZ, Company name: 中原传媒, Industry: 出版业
+Stock code: 000802.SZ, Company name: 北京文化, Industry: 影视音像
+Stock code: 000885.SZ, Company name: 城发环境, Industry: 环境保护
+Stock code: 000906.SZ, Company name: 浙商中拓, Industry: 仓储物流
+Stock code: 000913.SZ, Company name: 钱江摩托, Industry: 摩托车
+Stock code: 000915.SZ, Company name: 华特达因, Industry: 化学制药
+Stock code: 000928.SZ, Company name: 中钢国际, Industry: 建筑工程
+
+Stock code: 001227.SZ, Company name: 兰州银行, Industry: 银行
+等待70秒
+Stock code: 002014.SZ, Company name: 永新股份, Industry: 塑料
+Stock code: 002022.SZ, Company name: 科华生物, Industry: 医疗保健
+Stock code: 002034.SZ, Company name: 旺能环境, Industry: 环境保护
+Stock code: 002056.SZ, Company name: 横店东磁, Industry: 矿物制品
+Stock code: 002129.SZ, Company name: TCL中环, Industry: 电气设备
+Stock code: 002130.SZ, Company name: 沃尔核材, Industry: 电气设备
+Stock code: 002142.SZ, Company name: 宁波银行, Industry: 银行
+Stock code: 002173.SZ, Company name: 创新医疗, Industry: 医疗保健
+Stock code: 002318.SZ, Company name: 久立特材, Industry: 特种钢
+Stock code: 002346.SZ, Company name: 柘中股份, Industry: 电气设备
+Stock code: 002348.SZ, Company name: 高乐股份, Industry: 文教休闲
+Stock code: 002384.SZ, Company name: 东山精密, Industry: 元器件
+Stock code: 002459.SZ, Company name: 晶澳科技, Industry: 电气设备
+Stock code: 002466.SZ, Company name: 天齐锂业, Industry: 小金属
+等待70秒
+Stock code: 002533.SZ, Company name: 金杯电工, Industry: 电气设备
+Stock code: 002588.SZ, Company name: 史丹利, Industry: 农药化肥
+Stock code: 002603.SZ, Company name: 以岭药业, Industry: 中成药
+Stock code: 002652.SZ, Company name: 扬子新材, Industry: 其他建材
+Stock code: 002727.SZ, Company name: 一心堂, Industry: 医药商业
+Stock code: 002738.SZ, Company name: 中矿资源, Industry: 小金属
+Stock code: 002757.SZ, Company name: 南兴股份, Industry: 专用机械
+Stock code: 002788.SZ, Company name: 鹭燕医药, Industry: 医药商业
+Stock code: 002807.SZ, Company name: 江阴银行, Industry: 银行
+Stock code: 002839.SZ, Company name: 张家港行, Industry: 银行
+Stock code: 002948.SZ, Company name: 青岛银行, Industry: 银行
+Stock code: 002966.SZ, Company name: 苏州银行, Industry: 银行
+Stock code: 300073.SZ, Company name: 当升科技, Industry: 电气设备
+等待70秒
+Stock code: 300360.SZ, Company name: 炬华科技, Industry: 电器仪表
+等待70秒
+Stock code: 300861.SZ, Company name: 美畅股份, Industry: 矿物制品
+Stock code: 301109.SZ, Company name: 军信股份, Industry: 环境保护
+等待70秒
+等待70秒
+Stock code: 430718.BJ, Company name: 合肥高科, Industry: 家用电器
+Stock code: 600036.SH, Company name: 招商银行, Industry: 银行
+Stock code: 600039.SH, Company name: 四川路桥, Industry: 建筑工程
+Stock code: 600060.SH, Company name: 海信视像, Industry: 家用电器
+Stock code: 600089.SH, Company name: 特变电工, Industry: 电气设备
+Stock code: 600210.SH, Company name: 紫江企业, Industry: 广告包装
+Stock code: 600233.SH, Company name: 圆通速递, Industry: 仓储物流
+Stock code: 600248.SH, Company name: 陕建股份, Industry: 建筑工程
+Stock code: 600284.SH, Company name: 浦东建设, Industry: 建筑工程
+Stock code: 600325.SH, Company name: 华发股份, Industry: 区域地产
+Stock code: 600380.SH, Company name: 健康元, Industry: 化学制药
+Stock code: 600428.SH, Company name: 中远海特, Industry: 水运
+Stock code: 600438.SH, Company name: 通威股份, Industry: 电气设备
+Stock code: 600461.SH, Company name: 洪城环境, Industry: 水务
+Stock code: 600475.SH, Company name: 华光环能, Industry: 环境保护
+Stock code: 600479.SH, Company name: 千金药业, Industry: 中成药
+Stock code: 600496.SH, Company name: 精工钢构, Industry: 钢加工
+Stock code: 600502.SH, Company name: 安徽建工, Industry: 建筑工程
+Stock code: 600528.SH, Company name: 中铁工业, Industry: 运输设备
+等待70秒
+Stock code: 600531.SH, Company name: 豫光金铅, Industry: 铅锌
+Stock code: 600582.SH, Company name: 天地科技, Industry: 工程机械
+Stock code: 600583.SH, Company name: 海油工程, Industry: 石油开采
+Stock code: 600710.SH, Company name: 苏美达, Industry: 商贸代理
+Stock code: 600784.SH, Company name: 鲁银投资, Industry: 综合类
+Stock code: 600803.SH, Company name: 新奥股份, Industry: 供气供热
+Stock code: 600820.SH, Company name: 隧道股份, Industry: 建筑工程
+Stock code: 600874.SH, Company name: 创业环保, Industry: 环境保护
+Stock code: 600888.SH, Company name: 新疆众和, Industry: 铝
+Stock code: 600901.SH, Company name: 江苏金租, Industry: 多元金融
+Stock code: 600908.SH, Company name: 无锡银行, Industry: 银行
+Stock code: 600919.SH, Company name: 江苏银行, Industry: 银行
+Stock code: 600926.SH, Company name: 杭州银行, Industry: 银行
+Stock code: 601009.SH, Company name: 南京银行, Industry: 银行
+Stock code: 601012.SH, Company name: 隆基绿能, Industry: 电气设备
+Stock code: 601117.SH, Company name: 中国化学, Industry: 建筑工程
+Stock code: 601128.SH, Company name: 常熟银行, Industry: 银行
+Stock code: 601169.SH, Company name: 北京银行, Industry: 银行
+Stock code: 601186.SH, Company name: 中国铁建, Industry: 建筑工程
+Stock code: 601187.SH, Company name: 厦门银行, Industry: 银行
+等待70秒
+Stock code: 601229.SH, Company name: 上海银行, Industry: 银行
+Stock code: 601288.SH, Company name: 农业银行, Industry: 银行
+Stock code: 601298.SH, Company name: 青岛港, Industry: 港口
+Stock code: 601326.SH, Company name: 秦港股份, Industry: 港口
+Stock code: 601328.SH, Company name: 交通银行, Industry: 银行
+Stock code: 601390.SH, Company name: 中国中铁, Industry: 建筑工程
+Stock code: 601398.SH, Company name: 工商银行, Industry: 银行
+Stock code: 601528.SH, Company name: 瑞丰银行, Industry: 银行
+Stock code: 601577.SH, Company name: 长沙银行, Industry: 银行
+Stock code: 601611.SH, Company name: 中国核建, Industry: 建筑工程
+Stock code: 601618.SH, Company name: 中国中冶, Industry: 建筑工程
+Stock code: 601658.SH, Company name: 邮储银行, Industry: 银行
+Stock code: 601665.SH, Company name: 齐鲁银行, Industry: 银行
+Stock code: 601669.SH, Company name: 中国电建, Industry: 建筑工程
+Stock code: 601717.SH, Company name: 郑煤机, Industry: 专用机械
+Stock code: 601811.SH, Company name: 新华文轩, Industry: 出版业
+Stock code: 601818.SH, Company name: 光大银行, Industry: 银行
+Stock code: 601838.SH, Company name: 成都银行, Industry: 银行
+Stock code: 601860.SH, Company name: 紫金银行, Industry: 银行
+Stock code: 601900.SH, Company name: 南方传媒, Industry: 出版业
+Stock code: 601921.SH, Company name: 浙版传媒, Industry: 出版业
+Stock code: 601939.SH, Company name: 建设银行, Industry: 银行
+Stock code: 601963.SH, Company name: 重庆银行, Industry: 银行
+Stock code: 601985.SH, Company name: 中国核电, Industry: 新型电力
+Stock code: 601988.SH, Company name: 中国银行, Industry: 银行
+Stock code: 601998.SH, Company name: 中信银行, Industry: 银行
+Stock code: 603018.SH, Company name: 华设集团, Industry: 建筑工程
+Stock code: 603035.SH, Company name: 常熟汽饰, Industry: 汽车配件
+Stock code: 603227.SH, Company name: 雪峰科技, Industry: 化工原料
+Stock code: 603230.SH, Company name: 内蒙新华, Industry: 出版业
+等待70秒
+Stock code: 603323.SH, Company name: 苏农银行, Industry: 银行
+Stock code: 603357.SH, Company name: 设计总院, Industry: 建筑工程
+Stock code: 603366.SH, Company name: 日出东方, Industry: 家用电器
+Stock code: 603529.SH, Company name: 爱玛科技, Industry: 摩托车
+Stock code: 603639.SH, Company name: 海利尔, Industry: 农药化肥
+Stock code: 603688.SH, Company name: 石英股份, Industry: 矿物制品
+Stock code: 603889.SH, Company name: 新澳股份, Industry: 纺织
+Stock code: 605028.SH, Company name: 世茂能源, Industry: 供气供热
+Stock code: 605117.SH, Company name: 德业股份, Industry: 电气设备
+Stock code: 605168.SH, Company name: 三人行, Industry: 互联网
+Stock code: 605259.SH, Company name: 绿田机械, Industry: 农用机械
+Stock code: 605266.SH, Company name: 健之佳, Industry: 医药商业
+Stock code: 605368.SH, Company name: 蓝天燃气, Industry: 供气供热
+Stock code: 605377.SH, Company name: 华旺科技, Industry: 造纸
+Stock code: 605577.SH, Company name: 龙版传媒, Industry: 出版业
+Stock code: 688063.SH, Company name: 派能科技, Industry: 电气设备
+等待70秒
+Stock code: 688425.SH, Company name: 铁建重工, Industry: 专用机械
+等待70秒
+等待70秒
+等待70秒
+等待70秒
+等待70秒
+Stock code: 688556.SH, Company name: 高测股份, Industry: 专用机械
+Stock code: 688599.SH, Company name: 天合光能, Industry: 电气设备
+等待70秒
+Stock code: 830879.BJ, Company name: 基康仪器, Industry: 电器仪表
+等待70秒
+Stock code: 831689.BJ, Company name: 克莱特, Industry: 专用机械
+等待70秒
+Stock code: 832089.BJ, Company name: 禾昌聚合, Industry: 塑料
+等待70秒
+等待70秒
+Stock code: 832662.BJ, Company name: 方盛股份, Industry: 机械基件
+等待70秒
+等待70秒
+等待70秒
+Stock code: 834599.BJ, Company name: 同力股份, Industry: 专用机械
+Stock code: 834682.BJ, Company name: 球冠电缆, Industry: 电气设备
+等待70秒
+等待70秒
+Stock code: 836270.BJ, Company name: 天铭科技, Industry: 汽车配件
+等待70秒
+等待70秒
+Stock code: 836675.BJ, Company name: 秉扬科技, Industry: 矿物制品
+等待70秒
+Stock code: 836892.BJ, Company name: 广咨国际, Industry: 建筑工程
+等待70秒
+等待70秒
+等待70秒
+等待70秒
+等待70秒
+等待70秒
+等待70秒
+等待70秒
+等待70秒
+
+Process finished with exit code 0

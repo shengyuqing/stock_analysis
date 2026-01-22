@@ -2,8 +2,10 @@
 # pip install -U akshare pandas numpy tqdm
 
 from __future__ import annotations
+import json
 import os, time, math, traceback, gzip
 from datetime import datetime, timedelta
+from urllib import request, error
 
 import numpy as np
 import pandas as pd
@@ -30,6 +32,12 @@ CFG = {
     # 公告
     "notice_recent_pages": 20,
     "notice_lookback_days": 60,
+    # llm 模式需要配置 NOTICE_LLM_ENDPOINT / NOTICE_LLM_API_KEY
+    "notice_importance_mode": "heuristic",  # llm / heuristic / none
+    "notice_importance_default": 1.0,
+    "notice_importance_batch": 40,
+    "notice_importance_timeout": 12,
+    "notice_importance_floor": 0.05,
 
     # 机构调研
     "jgdy_lookback_days": 120,
@@ -69,6 +77,26 @@ CFG.update({
 
     # 公告类型：收敛为更像“产业催化”的
     "notice_report_types": ["重大事项", "融资公告", "资产重组"],
+})
+
+CFG.update({
+    # 公告重要性关键词（AI不可用时的降级）
+    "notice_importance_keywords": {
+        "重大": 1.0,
+        "重组": 1.0,
+        "收购": 0.95,
+        "并购": 0.95,
+        "回购": 0.9,
+        "预增": 0.85,
+        "大额": 0.8,
+        "签订": 0.8,
+        "中标": 0.8,
+        "合作": 0.75,
+        "停牌": 0.7,
+        "减持": 0.4,
+        "解除": 0.4,
+        "更正": 0.3,
+    },
 })
 
 
@@ -290,11 +318,109 @@ def fetch_notices() -> pd.DataFrame:
     print(f"[notice] merged: {len(out)} rows, date {dmin} ~ {dmax}")
     return out
 
+def _heuristic_notice_importance(title: str, notice_type: str | None, report_type: str | None) -> float:
+    title = str(title or "")
+    notice_type = str(notice_type or "")
+    report_type = str(report_type or "")
+    score = 0.4
+    for kw, w in CFG["notice_importance_keywords"].items():
+        if kw in title or kw in notice_type or kw in report_type:
+            score = max(score, w)
+    return float(score)
+
+def _post_llm_importance(items: list[dict]) -> list[float] | None:
+    endpoint = os.getenv("NOTICE_LLM_ENDPOINT", "").strip()
+    if not endpoint:
+        return None
+    payload = json.dumps({"items": items}).encode("utf-8")
+    headers = {"Content-Type": "application/json"}
+    api_key = os.getenv("NOTICE_LLM_API_KEY", "").strip()
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+    req = request.Request(endpoint, data=payload, headers=headers, method="POST")
+    try:
+        with request.urlopen(req, timeout=CFG["notice_importance_timeout"]) as resp:
+            body = resp.read()
+            data = json.loads(body.decode("utf-8"))
+    except error.URLError:
+        return None
+    if isinstance(data, dict) and "scores" in data:
+        scores = data.get("scores")
+    elif isinstance(data, dict) and "data" in data:
+        scores = [item.get("score") for item in data.get("data", [])]
+    else:
+        scores = None
+    if not scores or len(scores) != len(items):
+        return None
+    return [float(s) if s is not None else np.nan for s in scores]
+
+def attach_notice_importance(notice_df: pd.DataFrame) -> pd.DataFrame:
+    if notice_df is None or len(notice_df) == 0:
+        return notice_df
+    if CFG["notice_importance_mode"] == "none":
+        notice_df = notice_df.copy()
+        notice_df["notice_importance"] = CFG["notice_importance_default"]
+        return notice_df
+
+    notice_df = notice_df.copy()
+    title_col = "公告标题" if "公告标题" in notice_df.columns else None
+    type_col = "公告类型" if "公告类型" in notice_df.columns else None
+
+    items = []
+    for _, row in notice_df.iterrows():
+        items.append({
+            "title": str(row.get(title_col, "")) if title_col else "",
+            "notice_type": str(row.get(type_col, "")) if type_col else "",
+            "report_type": str(row.get("report_type", "")),
+        })
+
+    scores = None
+    if CFG["notice_importance_mode"] == "llm":
+        scores = []
+        batch = CFG["notice_importance_batch"]
+        for i in range(0, len(items), batch):
+            part = items[i:i + batch]
+            part_scores = _post_llm_importance(part)
+            if part_scores is None:
+                scores = None
+                break
+            scores.extend(part_scores)
+
+    if scores is None:
+        scores = [
+            _heuristic_notice_importance(
+                item.get("title"),
+                item.get("notice_type"),
+                item.get("report_type"),
+            )
+            for item in items
+        ]
+
+    notice_df["notice_importance"] = pd.to_numeric(scores, errors="coerce")
+    notice_df["notice_importance"] = notice_df["notice_importance"].fillna(CFG["notice_importance_default"])
+    notice_df["notice_importance"] = notice_df["notice_importance"].clip(
+        lower=CFG["notice_importance_floor"],
+        upper=1.0
+    )
+    return notice_df
+
 def stock_notice_features(notice_df: pd.DataFrame) -> pd.DataFrame:
-    cols = ["代码", "notice_7d", "notice_30d", "notice_lookback", "notice_accel", "last_notice"]
+    cols = [
+        "代码",
+        "notice_7d",
+        "notice_30d",
+        "notice_lookback",
+        "notice_accel",
+        "notice_imp_7d",
+        "notice_imp_30d",
+        "notice_imp_lookback",
+        "notice_imp_accel",
+        "last_notice",
+    ]
     if notice_df is None or len(notice_df) == 0:
         return pd.DataFrame(columns=cols)
 
+    notice_df = attach_notice_importance(notice_df)
     today = datetime.now().date()
     lookback = today - timedelta(days=CFG["notice_lookback_days"])
     df = notice_df[notice_df["公告日期"].notna() & (notice_df["公告日期"] >= lookback)].copy()
@@ -307,16 +433,27 @@ def stock_notice_features(notice_df: pd.DataFrame) -> pd.DataFrame:
 
     df["is7"] = (df["公告日期"] >= d7).astype(int)
     df["is30"] = (df["公告日期"] >= d30).astype(int)
+    df["notice_weight"] = pd.to_numeric(df.get("notice_importance", CFG["notice_importance_default"]), errors="coerce")
+    df["notice_weight"] = df["notice_weight"].fillna(CFG["notice_importance_default"]).clip(
+        lower=CFG["notice_importance_floor"],
+        upper=1.0
+    )
+    df["imp7"] = df["is7"] * df["notice_weight"]
+    df["imp30"] = df["is30"] * df["notice_weight"]
 
     feat = (df.groupby("代码", as_index=False)
               .agg(
                   notice_7d=("is7", "sum"),
                   notice_30d=("is30", "sum"),
                   notice_lookback=("公告日期", "size"),
+                  notice_imp_7d=("imp7", "sum"),
+                  notice_imp_30d=("imp30", "sum"),
+                  notice_imp_lookback=("notice_weight", "sum"),
                   last_notice=("公告日期", "max"),
               ))
 
     feat["notice_accel"] = (feat["notice_7d"] + 1) / (feat["notice_30d"] + 3)
+    feat["notice_imp_accel"] = (feat["notice_imp_7d"] + 1) / (feat["notice_imp_30d"] + 3)
     return feat
 
 
@@ -430,6 +567,7 @@ def build_concept_scores(members, notice_feat, jgdy_feat) -> pd.DataFrame:
 
     x = x.merge(notice_feat, on="代码", how="left").merge(jgdy_feat, on="代码", how="left")
     for c in ["notice_7d", "notice_30d", "notice_lookback", "notice_accel",
+              "notice_imp_7d", "notice_imp_30d", "notice_imp_lookback", "notice_imp_accel",
               "jgdy_7d", "jgdy_30d", "jgdy_lookback", "jgdy_accel"]:
         if c in x.columns:
             x[c] = pd.to_numeric(x[c], errors="coerce").fillna(0.0)
@@ -441,6 +579,9 @@ def build_concept_scores(members, notice_feat, jgdy_feat) -> pd.DataFrame:
     out = g.apply(lambda df: pd.Series({
         "notice_hit_7d": n_hit(df, "notice_7d", 1),
         "notice_hit_30d": n_hit(df, "notice_30d", 1),
+        "notice_imp_7d_sum": float(df["notice_imp_7d"].sum()),
+        "notice_imp_30d_sum": float(df["notice_imp_30d"].sum()),
+        "notice_imp_accel_mean": float(df["notice_imp_accel"].replace([np.inf, -np.inf], np.nan).fillna(0).mean()),
         "notice_accel_mean": float(df["notice_accel"].replace([np.inf, -np.inf], np.nan).fillna(0).mean()),
         "jgdy_sum_30d": float(df["jgdy_30d"].sum()),
         "jgdy_accel_mean": float(df["jgdy_accel"].replace([np.inf, -np.inf], np.nan).fillna(0).mean()),
@@ -470,17 +611,18 @@ def build_concept_scores(members, notice_feat, jgdy_feat) -> pd.DataFrame:
     den = np.sqrt(out["member_cnt"].clip(lower=1))
     out["notice_rate_7d"] = out["notice_hit_7d"] / den
     out["notice_rate_30d"] = out["notice_hit_30d"] / den
+    out["notice_imp_rate_7d"] = out["notice_imp_7d_sum"] / den
     out["jgdy_rate_30d"] = out["jgdy_sum_30d"] / den
 
     # --- 重新zscore：用 rate + accel，少用绝对量 ---
-    out["z_notice_rate_7d"] = _zscore(out["notice_rate_7d"])
-    out["z_notice_accel"] = _zscore(out["notice_accel_mean"])
+    out["z_notice_imp_rate_7d"] = _zscore(out["notice_imp_rate_7d"])
+    out["z_notice_imp_accel"] = _zscore(out["notice_imp_accel_mean"])
     out["z_jgdy_rate_30d"] = _zscore(out["jgdy_rate_30d"])
     out["z_jgdy_accel"] = _zscore(out["jgdy_accel_mean"])
 
     out["info_score"] = (
-            0.45 * out["z_notice_rate_7d"] +
-            0.20 * out["z_notice_accel"] +
+            0.45 * out["z_notice_imp_rate_7d"] +
+            0.20 * out["z_notice_imp_accel"] +
             0.25 * out["z_jgdy_rate_30d"] +
             0.10 * out["z_jgdy_accel"]
     )
@@ -488,7 +630,7 @@ def build_concept_scores(members, notice_feat, jgdy_feat) -> pd.DataFrame:
     out = out.sort_values("info_score", ascending=False).reset_index(drop=True)
 
     # 只对Top概念拉惩罚项，控制耗时
-    top_m = max(CFG["top_concepts"] * 2, 30)
+    top_m = min(len(out), max(CFG["top_concepts"] * 8, 200))
     concepts = out["概念"].head(top_m).tolist()
     rets = [concept_price_return(c) for c in concepts]
     funds = [concept_fund_20d(c) for c in concepts]
@@ -498,14 +640,16 @@ def build_concept_scores(members, notice_feat, jgdy_feat) -> pd.DataFrame:
 
     # ====== [替换] 过热惩罚：只惩罚“涨太多/流入太强”，不奖励下跌/流出 ======
     out["z_concept_ret_20d"] = _zscore(out["concept_ret_20d"])
-    out["z_concept_fund_in_20d"] = _zscore(out["concept_fund_in_20d"])
-
     def relu(x):
         return np.maximum(x, 0)
 
+    fund = pd.to_numeric(out["concept_fund_in_20d"], errors="coerce")
+    out["concept_fund_in_20d_pos"] = np.maximum(fund, 0.0)  # 只惩罚净流入
+    out["z_concept_fund_in_20d_pos"] = _zscore(out["concept_fund_in_20d_pos"])
+
     out["overheat"] = (
             0.55 * relu(out["z_concept_ret_20d"].fillna(0.0)) +
-            0.45 * relu(out["z_concept_fund_in_20d"].fillna(0.0))
+            0.45 * relu(out["z_concept_fund_in_20d_pos"].fillna(0.0))
     )
 
     out["incubating_score"] = out["info_score"] - out["overheat"]
@@ -576,6 +720,7 @@ def build_stock_watchlist(top_concepts, members, spot, notice_feat, jgdy_feat) -
 
     base = base.merge(notice_feat, on="代码", how="left").merge(jgdy_feat, on="代码", how="left")
     for c in ["notice_7d", "notice_30d", "notice_lookback", "notice_accel",
+              "notice_imp_7d", "notice_imp_30d", "notice_imp_lookback", "notice_imp_accel",
               "jgdy_7d", "jgdy_30d", "jgdy_lookback", "jgdy_accel"]:
         if c in base.columns:
             base[c] = pd.to_numeric(base[c], errors="coerce").fillna(0.0)
@@ -610,11 +755,18 @@ def build_stock_watchlist(top_concepts, members, spot, notice_feat, jgdy_feat) -
         return pd.DataFrame()
 
     w = pd.DataFrame(out_rows)
-    w["z_notice"] = _zscore(w["notice_30d"])
+    notice_score_col = "notice_imp_30d" if "notice_imp_30d" in w.columns else "notice_30d"
+    w["z_notice"] = _zscore(w[notice_score_col])
     w["z_jgdy"] = _zscore(w["jgdy_30d"])
     w["z_ret60"] = _zscore(w["ret60"].fillna(0))
     w["z_over_ma60"] = _zscore((w["close_over_ma60"] - 1).fillna(0))
-    w["stock_incubating_score"] = (0.55 * w["z_notice"] + 0.45 * w["z_jgdy"]) - (0.60 * w["z_ret60"] + 0.40 * w["z_over_ma60"])
+
+    def relu(x):
+        return np.maximum(x, 0)
+
+    w["overheat_stock"] = 0.60 * relu(w["z_ret60"]) + 0.40 * relu(w["z_over_ma60"])
+    w["stock_incubating_score"] = (0.55 * w["z_notice"] + 0.45 * w["z_jgdy"]) - w["overheat_stock"]
+    w = w[(w["ret60"] > -0.15) & (w["close_over_ma60"] > 0.92)].copy()
 
     w = w.sort_values(["概念", "stock_incubating_score"], ascending=[True, False]).reset_index(drop=True)
     return w
