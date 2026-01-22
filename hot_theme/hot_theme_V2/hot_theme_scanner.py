@@ -168,14 +168,53 @@ def normalize_stock_hist(df: pd.DataFrame) -> pd.DataFrame:
 # =========================
 # 数据拉取
 # =========================
-def fetch_concept_list() -> pd.DataFrame:
-    df = ak.stock_board_concept_name_em()
-    code_col = _pick_col(df, ["板块代码", "代码", "symbol"])
-    name_col = _pick_col(df, ["板块名称", "名称", "name"])
-    out = df[[code_col, name_col]].rename(columns={code_col: "concept_code", name_col: "concept_name"})
-    out["concept_code"] = out["concept_code"].astype(str)
-    out["concept_name"] = out["concept_name"].astype(str)
-    return out
+def fetch_concept_list(cfg: Config) -> pd.DataFrame:
+    code_keys = ["板块代码", "代码", "symbol", "code"]
+    name_keys = ["板块名称", "名称", "name"]
+    last_err = None
+    for i in range(cfg.retries + 1):
+        try:
+            time.sleep(random.uniform(*cfg.sleep_range))
+            df = ak.stock_board_concept_name_em()
+            code_col = _pick_col(df, code_keys)
+            name_col = _pick_col(df, name_keys)
+            out = df[[code_col, name_col]].rename(columns={code_col: "concept_code", name_col: "concept_name"})
+            out["concept_code"] = out["concept_code"].astype(str)
+            out["concept_name"] = out["concept_name"].astype(str)
+            return out
+        except Exception as e:
+            last_err = e
+            time.sleep(0.4 * (i + 1))
+
+    ths_api = getattr(ak, "stock_board_concept_name_ths", None)
+    if ths_api is not None:
+        for i in range(cfg.retries + 1):
+            try:
+                time.sleep(random.uniform(*cfg.sleep_range))
+                df = ths_api()
+                code_col = _pick_col(df, code_keys)
+                name_col = _pick_col(df, name_keys)
+                out = df[[code_col, name_col]].rename(columns={code_col: "concept_code", name_col: "concept_name"})
+                out["concept_code"] = out["concept_code"].astype(str)
+                out["concept_name"] = out["concept_name"].astype(str)
+                return out
+            except Exception as e:
+                last_err = e
+                time.sleep(0.4 * (i + 1))
+
+    out_dir = Path(cfg.out_dir)
+    if out_dir.exists():
+        cached = sorted(out_dir.glob("concept_rank_*.csv"), key=lambda p: p.stat().st_mtime, reverse=True)
+        if cached:
+            df = pd.read_csv(cached[0], encoding="utf-8-sig")
+            if {"concept_code", "concept_name"}.issubset(df.columns):
+                out = df[["concept_code", "concept_name"]].copy()
+                out["concept_code"] = out["concept_code"].astype(str)
+                out["concept_name"] = out["concept_name"].astype(str)
+                print(f"⚠️ 使用本地概念列表缓存：{cached[0]}")
+                return out
+
+    raise RuntimeError(f"概念列表拉取失败（已重试与回退），last_err={last_err}")
 
 
 def fetch_concept_hist(concept_name: str, concept_code: str, cfg: Config) -> pd.DataFrame:
@@ -224,8 +263,23 @@ def fetch_concept_cons(concept_name: str, concept_code: str, cfg: Config) -> pd.
     raise RuntimeError(f"概念成分拉取失败：{concept_name}/{concept_code}，last_err={last_err}")
 
 
-def fetch_a_spot() -> pd.DataFrame:
-    spot = ak.stock_zh_a_spot_em()
+def fetch_a_spot(cfg: Config) -> pd.DataFrame:
+    last_err = None
+    for i in range(cfg.retries + 1):
+        try:
+            time.sleep(random.uniform(*cfg.sleep_range))
+            spot = ak.stock_zh_a_spot_em()
+            break
+        except Exception as e:
+            last_err = e
+            time.sleep(0.4 * (i + 1))
+    else:
+        cache_path = Path(cfg.out_dir) / "spot_cache.csv"
+        if cache_path.exists():
+            spot = pd.read_csv(cache_path, encoding="utf-8-sig")
+            print(f"⚠️ 使用本地行情缓存：{cache_path}")
+        else:
+            raise RuntimeError(f"行情数据拉取失败（已重试与回退），last_err={last_err}")
     code_col = _pick_col(spot, ["代码", "证券代码"])
     name_col = _pick_col(spot, ["名称", "证券名称"])
     pct_col = _pick_col(spot, ["涨跌幅"])
@@ -268,6 +322,12 @@ def fetch_a_spot() -> pd.DataFrame:
     for c in ["pct_chg", "amount", "high", "low", "open", "last"]:
         if c in spot.columns:
             spot[c] = pd.to_numeric(spot[c], errors="coerce")
+    cache_path = Path(cfg.out_dir) / "spot_cache.csv"
+    try:
+        Path(cfg.out_dir).mkdir(parents=True, exist_ok=True)
+        spot.to_csv(cache_path, index=False, encoding="utf-8-sig")
+    except Exception:
+        pass
     return spot
 
 
@@ -334,7 +394,7 @@ def concept_stage(ret_5d: float, accel: float, amt_ratio: float, breakout_60d: f
 
 
 def build_concept_rank(cfg: Config) -> pd.DataFrame:
-    concept_list = fetch_concept_list()
+    concept_list = fetch_concept_list(cfg)
     if cfg.debug_sample and cfg.debug_sample > 0:
         concept_list = concept_list.head(cfg.debug_sample).copy()
 
@@ -384,7 +444,7 @@ def build_concept_rank(cfg: Config) -> pd.DataFrame:
 # 超短候选 + 龙头观察
 # =========================
 def build_short_candidates(concept_rank: pd.DataFrame, cfg: Config):
-    spot = fetch_a_spot()
+    spot = fetch_a_spot(cfg)
     top = concept_rank.head(cfg.top_k_concepts).copy()
 
     short_rows, observe_rows = [], []
@@ -465,7 +525,7 @@ def build_short_candidates(concept_rank: pd.DataFrame, cfg: Config):
 # 波段候选：趋势回踩买（2～8周）
 # =========================
 def build_swing_candidates(concept_rank: pd.DataFrame, cfg: Config) -> pd.DataFrame:
-    spot = fetch_a_spot()
+    spot = fetch_a_spot(cfg)
     top = concept_rank.head(cfg.top_k_concepts).copy()
 
     # 题材层：更偏“主线”筛选（避免纯情绪）
