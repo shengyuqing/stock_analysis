@@ -263,8 +263,23 @@ def fetch_concept_cons(concept_name: str, concept_code: str, cfg: Config) -> pd.
     raise RuntimeError(f"概念成分拉取失败：{concept_name}/{concept_code}，last_err={last_err}")
 
 
-def fetch_a_spot() -> pd.DataFrame:
-    spot = ak.stock_zh_a_spot_em()
+def fetch_a_spot(cfg: Config) -> pd.DataFrame:
+    last_err = None
+    for i in range(cfg.retries + 1):
+        try:
+            time.sleep(random.uniform(*cfg.sleep_range))
+            spot = ak.stock_zh_a_spot_em()
+            break
+        except Exception as e:
+            last_err = e
+            time.sleep(0.4 * (i + 1))
+    else:
+        cache_path = Path(cfg.out_dir) / "spot_cache.csv"
+        if cache_path.exists():
+            spot = pd.read_csv(cache_path, encoding="utf-8-sig")
+            print(f"⚠️ 使用本地行情缓存：{cache_path}")
+        else:
+            raise RuntimeError(f"行情数据拉取失败（已重试与回退），last_err={last_err}")
     code_col = _pick_col(spot, ["代码", "证券代码"])
     name_col = _pick_col(spot, ["名称", "证券名称"])
     pct_col = _pick_col(spot, ["涨跌幅"])
@@ -307,6 +322,12 @@ def fetch_a_spot() -> pd.DataFrame:
     for c in ["pct_chg", "amount", "high", "low", "open", "last"]:
         if c in spot.columns:
             spot[c] = pd.to_numeric(spot[c], errors="coerce")
+    cache_path = Path(cfg.out_dir) / "spot_cache.csv"
+    try:
+        Path(cfg.out_dir).mkdir(parents=True, exist_ok=True)
+        spot.to_csv(cache_path, index=False, encoding="utf-8-sig")
+    except Exception:
+        pass
     return spot
 
 
@@ -423,7 +444,7 @@ def build_concept_rank(cfg: Config) -> pd.DataFrame:
 # 超短候选 + 龙头观察
 # =========================
 def build_short_candidates(concept_rank: pd.DataFrame, cfg: Config):
-    spot = fetch_a_spot()
+    spot = fetch_a_spot(cfg)
     top = concept_rank.head(cfg.top_k_concepts).copy()
 
     short_rows, observe_rows = [], []
@@ -504,7 +525,7 @@ def build_short_candidates(concept_rank: pd.DataFrame, cfg: Config):
 # 波段候选：趋势回踩买（2～8周）
 # =========================
 def build_swing_candidates(concept_rank: pd.DataFrame, cfg: Config) -> pd.DataFrame:
-    spot = fetch_a_spot()
+    spot = fetch_a_spot(cfg)
     top = concept_rank.head(cfg.top_k_concepts).copy()
 
     # 题材层：更偏“主线”筛选（避免纯情绪）
