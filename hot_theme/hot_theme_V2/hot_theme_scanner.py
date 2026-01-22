@@ -169,13 +169,15 @@ def normalize_stock_hist(df: pd.DataFrame) -> pd.DataFrame:
 # 数据拉取
 # =========================
 def fetch_concept_list(cfg: Config) -> pd.DataFrame:
+    code_keys = ["板块代码", "代码", "symbol", "code"]
+    name_keys = ["板块名称", "名称", "name"]
     last_err = None
     for i in range(cfg.retries + 1):
         try:
             time.sleep(random.uniform(*cfg.sleep_range))
             df = ak.stock_board_concept_name_em()
-            code_col = _pick_col(df, ["板块代码", "代码", "symbol"])
-            name_col = _pick_col(df, ["板块名称", "名称", "name"])
+            code_col = _pick_col(df, code_keys)
+            name_col = _pick_col(df, name_keys)
             out = df[[code_col, name_col]].rename(columns={code_col: "concept_code", name_col: "concept_name"})
             out["concept_code"] = out["concept_code"].astype(str)
             out["concept_name"] = out["concept_name"].astype(str)
@@ -190,8 +192,8 @@ def fetch_concept_list(cfg: Config) -> pd.DataFrame:
             try:
                 time.sleep(random.uniform(*cfg.sleep_range))
                 df = ths_api()
-                code_col = _pick_col(df, ["板块代码", "代码", "symbol"])
-                name_col = _pick_col(df, ["板块名称", "名称", "name"])
+                code_col = _pick_col(df, code_keys)
+                name_col = _pick_col(df, name_keys)
                 out = df[[code_col, name_col]].rename(columns={code_col: "concept_code", name_col: "concept_name"})
                 out["concept_code"] = out["concept_code"].astype(str)
                 out["concept_name"] = out["concept_name"].astype(str)
