@@ -35,6 +35,13 @@ CFG = {
     "jgdy_lookback_days": 120,
     "jgdy_focus_days_1": 7,
     "jgdy_focus_days_2": 30,
+    "jgdy_institution_patterns": [
+        r"瑞银", r"UBS",
+        r"高盛", r"Goldman\\s*Sachs",
+        r"摩根士丹利", r"Morgan\\s*Stanley",
+        r"IMF", r"国际货币基金组织",
+        r"中金", r"中金公司", r"中国国际金融", r"CICC",
+    ],
 
     # 概念价格/资金惩罚
     "concept_price_days": 90,
@@ -73,6 +80,11 @@ CFG.update({
 
 
 # ---------------- utilities ----------------
+JG_AUTH_RE = re.compile(
+    "|".join(CFG["jgdy_institution_patterns"]),
+    flags=re.IGNORECASE
+) if CFG.get("jgdy_institution_patterns") else None
+
 def _ensure_dir(p: str):
     os.makedirs(p, exist_ok=True)
 
@@ -102,6 +114,18 @@ def pick_col(df: pd.DataFrame, candidates):
         if c in df.columns:
             return c
     return None
+
+def filter_authority_institutions(df: pd.DataFrame, inst_col: str | None) -> pd.DataFrame:
+    if not inst_col or JG_AUTH_RE is None or inst_col not in df.columns:
+        return df
+    inst_series = df[inst_col].astype(str).fillna("")
+    has_text = inst_series.str.contains(r"[A-Za-z\u4e00-\u9fff]", regex=True).any()
+    if not has_text:
+        return df
+    mask = inst_series.apply(lambda x: bool(JG_AUTH_RE.search(x)))
+    if not mask.any():
+        return df.iloc[0:0].copy()
+    return df.loc[mask].copy()
 
 def load_csv_cache(path: str, max_age_days: int):
     if not os.path.exists(path):
@@ -333,6 +357,7 @@ def fetch_jgdy() -> pd.DataFrame:
     name_col = pick_col(df, ["名称", "股票简称"])
     cnt_col = pick_col(df, ["接待机构数量"])
     day_col = pick_col(df, ["接待日期", "调研日期"])
+    inst_col = pick_col(df, ["接待机构", "机构名称", "机构", "调研机构", "接待机构名单"])
 
     if not code_col or not cnt_col or not day_col:
         return pd.DataFrame()
@@ -347,6 +372,7 @@ def fetch_jgdy() -> pd.DataFrame:
     df = df.dropna(subset=["代码"])
     df["调研日期"] = pd.to_datetime(df["调研日期"], errors="coerce").dt.date
     df["接待机构数量"] = pd.to_numeric(df["接待机构数量"], errors="coerce").fillna(0).astype(int)
+    df = filter_authority_institutions(df, inst_col)
     return df
 
 def stock_jgdy_features(jgdy_df: pd.DataFrame) -> pd.DataFrame:
